@@ -8,6 +8,8 @@ from lm import repackage_hidden, LM_LSTM
 import reader
 import numpy as np
 
+DEVICE = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 parser = argparse.ArgumentParser(description='Simplest LSTM-based language model in PyTorch')
 parser.add_argument('--data', type=str, default='data',
                     help='location of the data corpus')
@@ -42,15 +44,15 @@ def run_epoch(model, data, is_train=False, lr=1.0):
   costs = 0.0
   iters = 0
   for step, (x, y) in enumerate(reader.ptb_iterator(data, model.batch_size, model.num_steps)):
-    inputs = Variable(torch.from_numpy(x.astype(np.int64)).transpose(0, 1).contiguous()).cuda()
+    inputs = Variable(torch.from_numpy(x.astype(np.int64)).transpose(0, 1).contiguous()).to(DEVICE)
     model.zero_grad()
     hidden = repackage_hidden(hidden)
     outputs, hidden = model(inputs, hidden)
-    targets = Variable(torch.from_numpy(y.astype(np.int64)).transpose(0, 1).contiguous()).cuda()
+    targets = Variable(torch.from_numpy(y.astype(np.int64)).transpose(0, 1).contiguous()).to(DEVICE)
     tt = torch.squeeze(targets.view(-1, model.batch_size * model.num_steps))
 
     loss = criterion(outputs.view(-1, model.vocab_size), tt)
-    costs += loss.data[0] * model.num_steps
+    costs += loss.data.item() * model.num_steps
     iters += model.num_steps
 
     if is_train:
@@ -71,7 +73,7 @@ if __name__ == "__main__":
   print('Vocabluary size: {}'.format(vocab_size))
   model = LM_LSTM(embedding_dim=args.hidden_size, num_steps=args.num_steps, batch_size=args.batch_size,
                   vocab_size=vocab_size, num_layers=args.num_layers, dp_keep_prob=args.dp_keep_prob)
-  model.cuda()
+  model.to(DEVICE)
   lr = args.inital_lr
   # decay factor for learning rate
   lr_decay_base = 1 / 1.15
